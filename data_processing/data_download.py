@@ -4,7 +4,7 @@ import os
 import subprocess
 
 DATA_URL = "https://zenodo.org/record/2539424#.XbDPZOdKgWp"
-DATA_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Data")
+DATA_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "WikiLinksGraph")
 
 def download_data(url, save_folder_path):
     """
