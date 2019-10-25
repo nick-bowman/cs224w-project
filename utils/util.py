@@ -17,3 +17,27 @@ def countNewEdges(graph1, graph2):
         if graph1.IsEdge(e.GetSrcNId(), e.GetDstNId()):
             added += 1
     return added
+
+
+def findAddedEdgesInIntersection(graph1, graph2):
+    edges = set()
+    for edge in graph2.Edges():
+        start = edge.GetSrcNId()
+        end = edge.GetDstNId()
+        if graph1.IsNode(start) and graph1.IsNode(end):
+            if not graph1.IsEdge(start, end):
+                edges.add((start, end))
+    return edges
+
+def computeMetric(graph1, graph2, predictedEdges):
+    trueAddedEdges = findAddedEdgesInIntersection(graph1, graph2)
+
+    falsePositive = len(predictedEdges - trueAddedEdges)
+    falseNegative = len(trueAddedEdges - predictedEdges)
+    truePositive = len(trueAddedEdges.intersection(predictedEdges))
+
+    precision = truePositive / (truePositive + falsePositive)
+    recall = truePositive / (truePositive + falseNegative)
+    f1 = 2 * precision * recall / (precision + recall)
+
+    return (precision, recall, f1)
