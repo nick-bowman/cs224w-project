@@ -1,43 +1,43 @@
+import os
 
-# Graph2 is the more recent graph
-def countExistingAndRemovedEdges(graph1, graph2):
-    existing = 0
-    removed = 0
-    for e in graph1.Edges():
-        if graph2.IsEdge(e.GetSrcNId(), e.GetDstNId()):
-            existing += 1
-        else:
-            removed +=1
-    return (existing, removed)
+home = os.path.expanduser("~")
+base = os.path.join(home, "WikiLinksGraph/WikiLinksGraph")
+project_base = os.path.join(home, "cs224w-project")
 
-# Graph2 is the more recent graph
-def countNewEdges(graph1, graph2):
-    added = 0
-    for e in graph2.Edges():
-        if graph1.IsEdge(e.GetSrcNId(), e.GetDstNId()):
-            added += 1
-    return added
+def generate_file_name(language, year):
+    file_name = "%swiki.wikilink_graph.%s-03-01.csv" % (language, str(year))
+    return os.path.join(base, file_name)
 
+def generate_diff_file_name(lang, curr, future):
+    file_name = f"{lang}wiki-{curr}-{future}-diff.csv"
+    return os.path.join(project_base, "data_diffs", file_name)
 
-def findAddedEdgesInIntersection(graph1, graph2):
-    edges = set()
-    for edge in graph2.Edges():
-        start = edge.GetSrcNId()
-        end = edge.GetDstNId()
-        if graph1.IsNode(start) and graph1.IsNode(end):
-            if not graph1.IsEdge(start, end):
-                edges.add((start, end))
-    return edges
+def load_diff(language, curr_year, future_year):
+    all_edges = set()
+    with open(generate_diff_file_name(language, curr_year, future_year), "r") as f:
+        for line in f: 
+            src, dst = line.split()
+            all_edges.add((int(src),int(dst)))
+    return all_edges
 
-def computeMetric(graph1, graph2, predictedEdges):
-    trueAddedEdges = findAddedEdgesInIntersection(graph1, graph2)
+def evaluate_predicted_edges(lang, curr_year, future_year, predicted_edges, filter_nodes=None):
+    true_added_edges = load_diff(lang, curr_year, future_year)
+#     print(predicted_edges)
+#     print(true_added_edges)
+    
+    to_remove = set()
+    if filter_nodes:
+        for e in true_added_edges:
+            if e[0] not in filter_nodes or e[1] not in filter_nodes:
+                to_remove.add(e)
+    true_added_edges -= to_remove
 
-    falsePositive = len(predictedEdges - trueAddedEdges)
-    falseNegative = len(trueAddedEdges - predictedEdges)
-    truePositive = len(trueAddedEdges.intersection(predictedEdges))
+    false_positive = len(predicted_edges - true_added_edges)
+    false_negative = len(true_added_edges - predicted_edges)
+    true_positive = len(true_added_edges.intersection(predicted_edges))
 
-    precision = truePositive / (truePositive + falsePositive)
-    recall = truePositive / (truePositive + falseNegative)
+    precision = true_positive / (true_positive + false_positive)
+    recall = true_positive / (true_positive + false_negative)
     f1 = 2 * precision * recall / (precision + recall)
 
     return (precision, recall, f1)
