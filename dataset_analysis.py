@@ -45,6 +45,8 @@ def generate_edge_difference(lang, curr, future):
 #     print(gold_edges)
 
 def main():
+    if not os.path.exists("data_diffs"):
+        os.makedirs("data_diffs")
     for lang in reversed(LANGS):
         for year in YEARS:
             if year != 2018: 
