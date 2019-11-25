@@ -1,12 +1,22 @@
+"""Download WikiLinks data.
+
+Usage:
+  data_download.py
+
+Options:
+  -h --help     Show this screen.
+"""
+
+from docopt import docopt
 from bs4 import BeautifulSoup
 import requests
 import os
 import subprocess
 
-DATA_URL = "https://zenodo.org/record/2539424#.XbDPZOdKgWp"
-DATA_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "WikiLinksGraph")
+HOME_FOLDER = os.path.expanduser("~")
+WIKI_LINKS_GRAPH_URL = "https://zenodo.org/record/2539424#.XbDPZOdKgWp"
 
-def download_data(url, save_folder_path):
+def download_wiki_links_graph(url, save_folder_path):
     """
         Takes a url from which to download WikiLinksGraph data and saves it
         into the specified folder. The downloading is performed via scraping
@@ -15,8 +25,10 @@ def download_data(url, save_folder_path):
         
         Parameters
         ----------
-        url : (str) The url for the webpage hosting the download links
-        save_folder_path : Path to the folder to save the files
+        url : str
+            The url for the webpage hosting the download links
+        save_folder_path : str
+            Path to the folder to save the files
     """
     if not os.path.exists(save_folder_path):
         print("Creating folder to save data at {}".format(save_folder_path))
@@ -38,8 +50,10 @@ def download_data(url, save_folder_path):
         print(" ".join(command)) 
         subprocess.call(command)
 
-def main():
-    download_data(DATA_URL, DATA_FOLDER_PATH)
+def main(args):
+    save_folder_path = os.path.join(HOME_FOLDER, "WikiLinksGraph")
+    download_wiki_links_graph(WIKI_LINKS_GRAPH_URL, save_folder_path)
 
 if __name__ == "__main__":
-    main()
+    args = docopt(__doc__)
+    main(args)
