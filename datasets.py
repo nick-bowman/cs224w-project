@@ -157,7 +157,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
     
 if __name__ == "__main__":
-    test = WikiGraphsInMemoryDataset("es", 2002, 2003)
+    test = WikiGraphsInMemoryDataset("fr", 2002, 2003)
     print(test[0])
     
     
