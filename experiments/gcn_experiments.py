@@ -41,11 +41,11 @@ def build_optimizer(args, params):
     return scheduler, optimizer
 
 
-def train(dataset, args):
+def train(dataset, args, dev):
     loader = DataLoader(dataset, shuffle=True)#, batch_size=args.batch_size, shuffle=True)
 
     # build model
-    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, args)
+    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, args, dev).to(dev)
     scheduler, opt = build_optimizer(args, model.parameters())
         
     train_accs = []
@@ -116,7 +116,8 @@ class objectview(object):
         self.__dict__ = d
 
 def main():
-    dataset = WikiGraphsInMemoryDataset("es", 2002, 2003)
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = WikiGraphsInMemoryDataset("es", 2002, 2003, dev)
 #     dataset = Planetoid(root='/tmp/Cora', name='Cora')
     args_list = [
 #         {
@@ -148,7 +149,7 @@ def main():
     ]
     for args in args_list:
         args = objectview(args)
-        train_accs, test_accs, val_accs = train(dataset, args)
+        train_accs, test_accs, val_accs = train(dataset, args, dev)
         xs = list(range(0,args.epochs, 10))
         plt.plot(xs, train_accs,label="Train")
         plt.plot(xs, test_accs,label="Test")

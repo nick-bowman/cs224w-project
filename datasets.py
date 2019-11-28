@@ -11,7 +11,7 @@ from utils.util import project_base, generate_file_name, generate_diff_file_name
 import warnings
 warnings.filterwarnings("ignore")
 
-def create_masks(num_positive, num_negative, train, test, val):
+def create_masks(num_positive, num_negative, train, test, val, dev):
     num_positive_train = int(train * num_positive)
     num_positive_test = int(test * num_positive)
     num_positive_val = num_positive - num_positive_train - num_positive_test
@@ -50,14 +50,14 @@ def create_masks(num_positive, num_negative, train, test, val):
     val_mask_negative = torch.zeros(num_negative)
     val_mask_negative[mask_negative == 3] = 1
 
-    train_mask = torch.tensor(torch.cat((train_mask_positive, train_mask_negative)), dtype=torch.bool)
-    test_mask = torch.tensor(torch.cat((test_mask_positive, test_mask_negative)), dtype=torch.bool)
-    val_mask = torch.tensor(torch.cat((val_mask_positive, val_mask_negative)), dtype=torch.bool)
+    train_mask = torch.tensor(torch.cat((train_mask_positive, train_mask_negative)), dtype=torch.bool).to(dev)
+    test_mask = torch.tensor(torch.cat((test_mask_positive, test_mask_negative)), dtype=torch.bool).to(dev)
+    val_mask = torch.tensor(torch.cat((val_mask_positive, val_mask_negative)), dtype=torch.bool).to(dev)
     
     return train_mask, test_mask, val_mask
 
 class WikiGraphsInMemoryDataset(InMemoryDataset):
-    def __init__(self, lang, current_year, future_year, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=100, train=0.8, test=0.1, val=0.1):
+    def __init__(self, lang, current_year, future_year, dev, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=100, train=0.8, test=0.1, val=0.1):
         self.lang = lang
         self.current_year = current_year
         self.future_year = future_year
@@ -66,6 +66,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         self.train = train
         self.test = test
         self.val = val
+        self.dev = dev
         self._edge_map = {}
         self.edge_counter = 0
         super(WikiGraphsInMemoryDataset, self).__init__(os.path.join(project_base, "datasets"), transform, pre_transform)
@@ -107,7 +108,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         diff_file = generate_diff_file_name(self.lang, self.current_year, self.future_year)
         
         g = snap.LoadEdgeList(snap.PNGraph, graph_file, 0, 2, "\t")
-        edge_index = torch.tensor([[0] * g.GetEdges(), [0] * g.GetEdges()])
+        edge_index = torch.tensor([[0] * g.GetEdges(), [0] * g.GetEdges()]).to(self.dev)
         i = 0
         for e in g.Edges():
             src = self.get_renumbered_edge(e.GetSrcNId())
@@ -117,14 +118,14 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
             i += 1
         
         # TODO: replace with more complex node feature generation
-        x = torch.ones(size=(g.GetNodes(), self.feature_dim))
+        x = torch.ones(size=(g.GetNodes(), self.feature_dim)).to(self.dev)
         
         diff_g = snap.LoadEdgeList(snap.PNGraph, diff_file, 0, 1, "\t")
         num_positive = diff_g.GetEdges()
         num_edges_in_dataset = int(num_positive / self.sample_factor)
         num_negative = num_edges_in_dataset - num_positive
-        edge_list = torch.tensor([[0] * num_edges_in_dataset, [0] * num_edges_in_dataset])
-        y = torch.zeros(num_edges_in_dataset)
+        edge_list = torch.tensor([[0] * num_edges_in_dataset, [0] * num_edges_in_dataset]).to(self.dev)
+        y = torch.zeros(num_edges_in_dataset).to(self.dev)
         i = 0
         for e in diff_g.Edges():
             src = self.get_renumbered_edge(e.GetSrcNId())
@@ -145,9 +146,9 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
                 edge_list[1][i] = dst
                 i += 1
         
-        train_mask, test_mask, val_mask = create_masks(num_positive, num_negative, self.train, self.test, self.val)
+        train_mask, test_mask, val_mask = create_masks(num_positive, num_negative, self.train, self.test, self.val, self.dev)
                 
-        data = Data(x=x, edge_index=edge_index, y=torch.tensor(y, dtype=torch.long))
+        data = Data(x=x, edge_index=edge_index, y=torch.tensor(y, dtype=torch.long).to(self.dev))
         data.eval_edges = edge_list
         data.train_mask = train_mask
         data.test_mask = test_mask

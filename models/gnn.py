@@ -6,7 +6,7 @@ import torch_geometric.nn as pyg_nn
 import torch_geometric.utils as pyg_utils
 
 class GNNStack(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, args):
+    def __init__(self, input_dim, hidden_dim, output_dim, args, dev):
         super(GNNStack, self).__init__()
         conv_model = self.build_conv_model(args.model_type)
         self.convs = nn.ModuleList()
@@ -23,6 +23,7 @@ class GNNStack(torch.nn.Module):
         self.dropout = args.dropout
         self.num_layers = args.num_layers
         self.hidden_dim = hidden_dim
+        self.dev = dev
 
     def build_conv_model(self, model_type):
         if model_type == 'GCN':
@@ -59,7 +60,7 @@ class GNNStack(torch.nn.Module):
 
         ############################################################################
 
-        edge_concats = torch.zeros((eval_edges.shape[1], 2 * self.hidden_dim))
+        edge_concats = torch.zeros((eval_edges.shape[1], 2 * self.hidden_dim)).to(self.dev)
         for c in range(eval_edges.shape[1]):
             edge_concats[c] = torch.cat((x[eval_edges[0][c]], x[eval_edges[1][c]]))
         x = self.post_mp(edge_concats)
