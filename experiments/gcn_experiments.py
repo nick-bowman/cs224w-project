@@ -117,7 +117,7 @@ class objectview(object):
 
 def main():
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = WikiGraphsInMemoryDataset("es", 2002, 2003, dev)
+    dataset = WikiGraphsInMemoryDataset("es", 2004, 2005, dev)
 #     dataset = Planetoid(root='/tmp/Cora', name='Cora')
     args_list = [
 #         {
@@ -126,7 +126,7 @@ def main():
 #             'batch_size': 32,
 #             'hidden_dim': 64,
 #             'dropout': 0.25, 
-#             'epochs': 250,
+#             'epochs': 500,
 #             'opt': 'adam',
 #             'opt_scheduler': 'none',
 #             'opt_restart': 0,
@@ -138,8 +138,8 @@ def main():
             'num_layers': 4, 
             'batch_size': 32,
             'hidden_dim': 64,
-            'dropout': 0.25, 
-            'epochs': 250,
+            'dropout': 0.50, 
+            'epochs': 500,
             'opt': 'adam',
             'opt_scheduler': 'none',
             'opt_restart': 0,

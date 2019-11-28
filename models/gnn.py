@@ -60,9 +60,10 @@ class GNNStack(torch.nn.Module):
 
         ############################################################################
 
-        edge_concats = torch.zeros((eval_edges.shape[1], 2 * self.hidden_dim)).to(self.dev)
-        for c in range(eval_edges.shape[1]):
-            edge_concats[c] = torch.cat((x[eval_edges[0][c]], x[eval_edges[1][c]]))
+#         edge_concats = torch.zeros((eval_edges.shape[1], 2 * self.hidden_dim)).to(self.dev)
+#         for c in range(eval_edges.shape[1]):
+#             edge_concats[c] = torch.cat((x[eval_edges[0][c]], x[eval_edges[1][c]]))
+        edge_concats = torch.cat((x[eval_edges[0]], x[eval_edges[1]]),dim=1)
         x = self.post_mp(edge_concats)
 
         return F.log_softmax(x, dim=1)
