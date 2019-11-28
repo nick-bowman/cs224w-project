@@ -17,18 +17,18 @@ class GNNStack(torch.nn.Module):
 
         # post-message-passing
         self.post_mp = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.Dropout(args.dropout), 
+            nn.Linear(hidden_dim * 2, hidden_dim), nn.Dropout(args.dropout), 
             nn.Linear(hidden_dim, output_dim))
 
         self.dropout = args.dropout
         self.num_layers = args.num_layers
+        self.hidden_dim = hidden_dim
 
     def build_conv_model(self, model_type):
-        return GraphSage
-#         if model_type == 'GCN':
-#             return pyg_nn.GCNConv
-#         elif model_type == 'GraphSage':
-#             return GraphSage
+        if model_type == 'GCN':
+            return pyg_nn.GCNConv
+        elif model_type == 'GraphSage':
+            return GraphSage
 #         elif model_type == 'GAT':
 #             # When applying GAT with num heads > 1, one needs to modify the 
 #             # input and output dimension of the conv layers (self.convs),
@@ -40,7 +40,7 @@ class GNNStack(torch.nn.Module):
 #             return GAT
 
     def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x, edge_index, batch, eval_edges = data.x, data.edge_index, data.batch, data.eval_edges
 
         ############################################################################
         # TODO: Your code here! 
@@ -59,7 +59,10 @@ class GNNStack(torch.nn.Module):
 
         ############################################################################
 
-        x = self.post_mp(x)
+        edge_concats = torch.zeros((eval_edges.shape[1], 2 * self.hidden_dim))
+        for c in range(eval_edges.shape[1]):
+            edge_concats[c] = torch.cat((x[eval_edges[0][c]], x[eval_edges[1][c]]))
+        x = self.post_mp(edge_concats)
 
         return F.log_softmax(x, dim=1)
 

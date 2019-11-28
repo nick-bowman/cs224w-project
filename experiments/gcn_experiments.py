@@ -13,16 +13,44 @@ import torch_geometric.nn as pyg_nn
 
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append("..")
 
-def train(dataset, task, args):
-    test_loader = loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+from datasets import WikiGraphsInMemoryDataset
+from models.gnn import GNNStack
+
+import torch.optim as optim
+
+def build_optimizer(args, params):
+    weight_decay = args.weight_decay
+    filter_fn = filter(lambda p : p.requires_grad, params)
+    if args.opt == 'adam':
+        optimizer = optim.Adam(filter_fn, lr=args.lr, weight_decay=weight_decay)
+    elif args.opt == 'sgd':
+        optimizer = optim.SGD(filter_fn, lr=args.lr, momentum=0.95, weight_decay=weight_decay)
+    elif args.opt == 'rmsprop':
+        optimizer = optim.RMSprop(filter_fn, lr=args.lr, weight_decay=weight_decay)
+    elif args.opt == 'adagrad':
+        optimizer = optim.Adagrad(filter_fn, lr=args.lr, weight_decay=weight_decay)
+    if args.opt_scheduler == 'none':
+        return None, optimizer
+    elif args.opt_scheduler == 'step':
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.opt_decay_step, gamma=args.opt_decay_rate)
+    elif args.opt_scheduler == 'cos':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.opt_restart)
+    return scheduler, optimizer
+
+
+def train(dataset, args):
+    loader = DataLoader(dataset, shuffle=True)#, batch_size=args.batch_size, shuffle=True)
 
     # build model
-    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, 
-                            args, task=task)
+    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, args)
     scheduler, opt = build_optimizer(args, model.parameters())
-
-    to_plot = []
+        
+    train_accs = []
+    test_accs = []
+    val_accs = []
     # train
     for epoch in range(args.epochs):
         total_loss = 0
@@ -31,25 +59,27 @@ def train(dataset, task, args):
             opt.zero_grad()
             pred = model(batch)
             label = batch.y
-            if task == 'node':
-                pred = pred[batch.train_mask]
-                label = label[batch.train_mask]
+            pred = pred[batch.train_mask]
+            label = label[batch.train_mask]
             loss = model.loss(pred, label)
             loss.backward()
             opt.step()
             total_loss += loss.item() * batch.num_graphs
         total_loss /= len(loader.dataset)
-        # print(total_loss)
+        print(total_loss)
 
         if epoch % 10 == 0:
-            test_acc = test(test_loader, model)
+            train_acc = test(loader, model)
+            train_accs.append(train_acc)
+            test_acc = test(loader, model, is_test=True)
             print(test_acc,   '  test', epoch)
-            val_acc = test(test_loader, model, is_validation=True)
-            to_plot.append(val_acc)
+            test_accs.append(test_acc)
+            val_acc = test(loader, model, is_validation=True)
+            val_accs.append(val_acc)
     
-    return to_plot
+    return train_accs, test_accs, val_accs
 
-def test(loader, model, is_validation=False):
+def test(loader, model, is_test=False, is_validation=False):
     model.eval()
 
     correct = 0
@@ -58,22 +88,27 @@ def test(loader, model, is_validation=False):
             # max(dim=1) returns values, indices tuple; only need indices
             pred = model(data).max(dim=1)[1]
             label = data.y
-
-        if model.task == 'node':
-            mask = data.val_mask if is_validation else data.test_mask
-            # node classification: only evaluate on nodes in test set
-            pred = pred[mask]
-            label = data.y[mask]
+        
+        mask = data.train_mask
+        if is_test:
+            mask = data.test_mask
+        elif is_validation:
+            mask = data.val_mask
+            
+        pred = pred[mask]
+        label = data.y[mask]
             
         correct += pred.eq(label).sum().item()
     
-    if model.task == 'graph':
-        total = len(loader.dataset) 
-    else:
-        total = 0
-        for data in loader.dataset:
-            # total += torch.sum(data.test_mask).item()
-            total += torch.sum(data.val_mask if is_validation else data.test_mask).item()
+    total = 0
+    for data in loader.dataset:
+        mask = data.train_mask
+        if is_test:
+            mask = data.test_mask
+        elif is_validation:
+            mask = data.val_mask
+        total += torch.sum(mask).item()
+    
     return correct / total
   
 class objectview(object):
@@ -81,16 +116,51 @@ class objectview(object):
         self.__dict__ = d
 
 def main():
-    cora_data = {}
-    enzymes_data = {}
+    dataset = WikiGraphsInMemoryDataset("es", 2002, 2003)
+#     dataset = Planetoid(root='/tmp/Cora', name='Cora')
     args_list = [
-                  {'model_type': 'GCN', 'num_layers': 2, 'batch_size': 32, 'hidden_dim': 32, 'dropout': 0.5, 'epochs': 500, 'opt': 'adam', 'opt_scheduler': 'none', 'opt_restart': 0, 'weight_decay': 5e-3, 'lr': 0.01},,
-                  {'model_type': 'GraphSage', 'dataset': 'cora', 'num_layers': 2, 'batch_size': 32, 'hidden_dim': 32, 'dropout': 0.5, 'epochs': 500, 'opt': 'adam', 'opt_scheduler': 'none', 'opt_restart': 0, 'weight_decay': 5e-3, 'lr': 0.01},
-,
+#         {
+#             'model_type': 'GCN',
+#             'num_layers': 4, 
+#             'batch_size': 32,
+#             'hidden_dim': 64,
+#             'dropout': 0.25, 
+#             'epochs': 250,
+#             'opt': 'adam',
+#             'opt_scheduler': 'none',
+#             'opt_restart': 0,
+#             'weight_decay': 5e-3,
+#             'lr': 0.01
+#         },
+        {
+            'model_type': 'GraphSage',
+            'num_layers': 4, 
+            'batch_size': 32,
+            'hidden_dim': 64,
+            'dropout': 0.25, 
+            'epochs': 250,
+            'opt': 'adam',
+            'opt_scheduler': 'none',
+            'opt_restart': 0,
+            'weight_decay': 5e-3,
+            'lr': 0.01
+        }  
     ]
     for args in args_list:
         args = objectview(args)
-        data = train(dataset, task, args)
+        train_accs, test_accs, val_accs = train(dataset, args)
+        xs = list(range(0,args.epochs, 10))
+        plt.plot(xs, train_accs,label="Train")
+        plt.plot(xs, test_accs,label="Test")
+        plt.plot(xs, val_accs,label="Validation")
+        plt.xlabel('Number of Epochs')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy vs. Number of Epochs for Spanish 2002-2003 Dataset')
+        plt.legend()
+        plt.savefig('plot.png')
+        # TODO: plot train/val loss data here
 
+if __name__ == "__main__":
+    main()
   
   
