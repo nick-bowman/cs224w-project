@@ -20,15 +20,11 @@ def create_masks(num_positive, num_negative, train, test, val):
     num_negative_test = int(test * num_negative)
     num_negative_val = num_negative - num_negative_train - num_negative_test
         
-#     print(num_positive_train, num_positive_test, num_positive_val)
-#     print(num_negative_train, num_negative_test, num_negative_val)
-        
     mask_positive = torch.zeros(num_positive)
     mask_positive[:num_positive_train] = 1
     mask_positive[num_positive_train:num_positive_train + num_positive_test] = 2
     mask_positive[num_positive_train + num_positive_test:] = 3
     mask_positive = mask_positive[torch.randperm(num_positive)]
-#     print(mask_positive)
         
     train_mask_positive = torch.zeros(num_positive)
     train_mask_positive[mask_positive == 1] = 1
@@ -38,17 +34,12 @@ def create_masks(num_positive, num_negative, train, test, val):
         
     val_mask_positive = torch.zeros(num_positive)
     val_mask_positive[mask_positive == 3] = 1
-        
-#     print(train_mask_positive)
-#     print(test_mask_positive)
-#     print(val_mask_positive)
     
     mask_negative = torch.zeros(num_negative)
     mask_negative[:num_negative_train] = 1
     mask_negative[num_negative_train:num_negative_train + num_negative_test] = 2
     mask_negative[num_negative_train + num_negative_test:] = 3
     mask_negative = mask_negative[torch.randperm(num_negative)]
-#     print(mask_negative)
         
     train_mask_negative = torch.zeros(num_negative)
     train_mask_negative[mask_negative == 1] = 1
@@ -58,10 +49,6 @@ def create_masks(num_positive, num_negative, train, test, val):
         
     val_mask_negative = torch.zeros(num_negative)
     val_mask_negative[mask_negative == 3] = 1
-        
-#     print(train_mask_negative)
-#     print(test_mask_negative)
-#     print(val_mask_negative)
 
     train_mask = torch.tensor(torch.cat((train_mask_positive, train_mask_negative)), dtype=torch.bool)
     test_mask = torch.tensor(torch.cat((test_mask_positive, test_mask_negative)), dtype=torch.bool)
@@ -79,10 +66,10 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         self.train = train
         self.test = test
         self.val = val
+        self._edge_map = {}
+        self.edge_counter = 0
         super(WikiGraphsInMemoryDataset, self).__init__(os.path.join(project_base, "datasets"), transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
-
-        
                                                     
     @property
     def raw_file_names(self):
@@ -95,10 +82,24 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
     @property
     def num_node_features(self):
         return self.feature_dim
+    
+    @property
+    def num_classes(self):
+        return 2
+    
+    @property
+    def edge_map(self):
+        return self._edge_map
 
     def download(self):
         # Download to `self.raw_dir`.
         pass
+    
+    def get_renumbered_edge(self, nid):
+        if nid not in self._edge_map: 
+            self._edge_map[nid] = self.edge_counter
+            self.edge_counter += 1
+        return self._edge_map[nid]
     
     def process(self):
         data_list = []
@@ -109,8 +110,10 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         edge_index = torch.tensor([[0] * g.GetEdges(), [0] * g.GetEdges()])
         i = 0
         for e in g.Edges():
-            edge_index[0][i] = e.GetSrcNId()
-            edge_index[1][i] = e.GetDstNId()
+            src = self.get_renumbered_edge(e.GetSrcNId())
+            dst = self.get_renumbered_edge(e.GetDstNId())
+            edge_index[0][i] = src
+            edge_index[1][i] = dst
             i += 1
         
         # TODO: replace with more complex node feature generation
@@ -124,8 +127,10 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         y = torch.zeros(num_edges_in_dataset)
         i = 0
         for e in diff_g.Edges():
-            edge_list[0][i] = e.GetSrcNId()
-            edge_list[1][i] = e.GetDstNId()
+            src = self.get_renumbered_edge(e.GetSrcNId())
+            dst = self.get_renumbered_edge(e.GetDstNId())
+            edge_list[0][i] = src
+            edge_list[1][i] = dst
             i += 1
         
         y[:num_positive] = 1
@@ -134,13 +139,15 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
             src = g.GetRndNId()
             dst = g.GetRndNId()
             if not g.IsEdge(src, dst) and not diff_g.IsEdge(src, dst):
+                src = self.get_renumbered_edge(src)
+                dst = self.get_renumbered_edge(dst)
                 edge_list[0][i] = src
                 edge_list[1][i] = dst
                 i += 1
         
         train_mask, test_mask, val_mask = create_masks(num_positive, num_negative, self.train, self.test, self.val)
                 
-        data = Data(x=x, edge_index=edge_index, y=y)
+        data = Data(x=x, edge_index=edge_index, y=torch.tensor(y, dtype=torch.long))
         data.eval_edges = edge_list
         data.train_mask = train_mask
         data.test_mask = test_mask
@@ -158,7 +165,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
     
 if __name__ == "__main__":
     test = WikiGraphsInMemoryDataset("fr", 2002, 2003)
-    print(test[0])
+#     print(test[0])
     
     
     
