@@ -166,7 +166,6 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
     
 if __name__ == "__main__":
     test = WikiGraphsInMemoryDataset("fr", 2002, 2003)
-#     print(test[0])
     
     
     
