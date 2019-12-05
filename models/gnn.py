@@ -137,7 +137,7 @@ class GraphSage(pyg_nn.MessagePassing):
 class GAT(pyg_nn.MessagePassing):
 
     def __init__(self, in_channels, out_channels, num_heads=1, concat=True,
-                 dropout=0.25, bias=True, **kwargs):
+                 dropout=0, bias=True, **kwargs):
         super(GAT, self).__init__(aggr='add', **kwargs)
 
         self.in_channels = in_channels

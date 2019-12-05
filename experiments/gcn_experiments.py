@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
+
 
 from torch_geometric.datasets import TUDataset
 from torch_geometric.datasets import Planetoid
@@ -61,30 +63,30 @@ def train(dataset, args, dev):
     loss_data = []
     # train
     for epoch in tqdm(range(args.epochs)):
-        total_loss = 0
+        train_loss = 0
+        val_loss = 0
         model.train()
         for batch in loader:
             opt.zero_grad()
             pred = model(batch)
             label = batch.y
+            with torch.no_grad():
+                val_loss += F.nll_loss(pred[batch.val_mask], label[batch.val_mask],weight=torch.Tensor([1,3]).to(dev))
             pred = pred[batch.train_mask]
             label = label[batch.train_mask]
             loss = model.loss(pred, label)
             loss.backward()
             opt.step()
-            total_loss += loss.item() * batch.num_graphs
-        total_loss /= len(loader.dataset)
-        if epoch % 10 == 0:
-            loss_data.append(total_loss)
-            #print(total_loss)
+            train_loss += loss.item() * batch.num_graphs
+            
+        train_loss /= len(loader.dataset)
+        val_loss /= len(loader.dataset)
 
         if epoch % 10 == 0:
-            # print("Epoch ", epoch)
+            loss_data.append((train_loss, val_loss))
             train_acc, train_prec, train_recall, train_f1 = test(loader, model)
-            # print("Train ", train_acc, train_prec, train_recall, train_f1)
             train_plot_data.append((train_acc, train_prec, train_recall, train_f1))
             val_acc, val_prec, val_recall, val_f1 = test(loader, model, is_validation=True)
-            # print("Validation ", val_acc, val_prec, val_recall, val_f1)
             val_plot_data.append((val_acc, val_prec, val_recall, val_f1))
     
     return train_plot_data, val_plot_data, loss_data
@@ -150,7 +152,7 @@ def generate_file_name(dname, data, lang, curr, nxt, args):
 def plot_results(train_data, val_data, loss_data, lang, curr, nxt, args):
     now = datetime.now()
     time = now.strftime("%m-%d-%Y-%H:%M:%S")
-    dname = os.path.join("plots", time)
+    dname = os.path.join("plots", f"{lang}-{curr}-{nxt}-{args.model_type}-{time}")
     os.mkdir(dname)
     
     train_accs = [t[0] for t in train_data]
@@ -169,74 +171,19 @@ def plot_results(train_data, val_data, loss_data, lang, curr, nxt, args):
     val_f1s = [t[3] for t in val_data]
     generate_single_plot(train_f1s, val_f1s, args.epochs, "F1", generate_title("F1", lang, curr, nxt), generate_file_name(dname, "f1", lang, curr, nxt, args))
 
-    generate_loss_plot(dname, loss_data, lang, curr, nxt, args)
-
-    
-    
-def generate_loss_plot(dname, loss_data, lang, curr_year, future_year, args):
-    xs = list(range(0, args.epochs, 10))
-    fig, ax = plt.subplots()
-    ax.plot(xs, loss_data)
-    ax.set_xlabel('Number of Epochs')
-    ax.set_ylabel('Loss')
-    ax.set_title('Loss Plot')
-    fig.savefig(generate_file_name(dname, "loss", lang, curr_year, future_year, args))
+    train_loss = [t[0] for t in loss_data]
+    val_loss = [t[1] for t in loss_data]
+    generate_single_plot(train_loss, val_loss, args.epochs, "Loss", generate_title("Loss", lang, curr, nxt), generate_file_name(dname, "loss", lang, curr, nxt, args))
     
 def run_experiment(lang, curr_year, future_year, args_list):
-    dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
-    for args in args_list:
-        args = objectview(args)
-        train_plot_data, val_plot_data, loss_data = train(dataset, args, dev)
-        plot_results(train_plot_data, val_plot_data, loss_data, lang, curr_year, future_year, args)
-
-
-def main():
-    args_list = [
-        {
-            'model_type': 'GCN',
-            'num_layers': 4, 
-            'batch_size': 32,
-            'hidden_dim': 64,
-            'dropout': 0.25, 
-            'epochs': 500,
-            'opt': 'adam',
-            'opt_scheduler': 'none',
-            'opt_restart': 0,
-            'weight_decay': 5e-3,
-            'lr': 0.01
-        },
-        {
-            'model_type': 'GraphSage',
-            'num_layers': 4, 
-            'batch_size': 32,
-            'hidden_dim': 64,
-            'dropout': 0.25, 
-            'epochs': 500,
-            'opt': 'adam',
-            'opt_scheduler': 'none',
-            'opt_restart': 0,
-            'weight_decay': 5e-3,
-            'lr': 0.01
-        },
-        {
-            'model_type': 'GAT',
-            'num_heads': 3,
-            'num_layers': 4, 
-            'batch_size': 32,
-            'hidden_dim': 64,
-            'dropout': 0.25, 
-            'epochs': 500,
-            'opt': 'adam',
-            'opt_scheduler': 'none',
-            'opt_restart': 0,
-            'weight_decay': 5e-3,
-            'lr': 0.01
-        }  
-    ]
-    run_experiment("es", 2006, 2007, args_list)
-
-if __name__ == "__main__":
-    main()
-  
+    try:
+        print(f"Dataset: {lang}-{curr_year}-{future_year}")
+        dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
+        for args in args_list:
+            args = objectview(args)
+            train_plot_data, val_plot_data, loss_data = train(dataset, args, dev)
+            plot_results(train_plot_data, val_plot_data, loss_data, lang, curr_year, future_year, args)
+    except: 
+        print("Experiment failed due to out of memory error")
   
