@@ -121,7 +121,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
             i += 1
         
         # TODO: replace with more complex node feature generation
-        if self.node_features.any():
+        if self.node_features is not None:
             self.feature_dim = self.node_features.shape[1]
             x = torch.ones(size=(g.GetNodes(), self.node_features.shape[1])).to(self.dev)
             for init_id, feature_row in self.node_feature_mapping.items():
@@ -163,6 +163,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         data.train_mask = train_mask
         data.test_mask = test_mask
         data.val_mask = val_mask
+        data.reverse_edge_map = torch.tensor([t[0] for t in sorted(self._edge_map.items(), key=lambda t: t[1])], dtype=torch.long).to(self.dev)
         data_list.append(data)     
     
         if self.pre_filter is not None:

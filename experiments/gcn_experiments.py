@@ -89,7 +89,7 @@ def train(dataset, args, dev):
             val_acc, val_prec, val_recall, val_f1 = test(loader, model, is_validation=True)
             val_plot_data.append((val_acc, val_prec, val_recall, val_f1))
     
-    return train_plot_data, val_plot_data, loss_data
+    return train_plot_data, val_plot_data, loss_data, model, loader
 
 def test(loader, model, is_test=False, is_validation=False):
     model.eval()
@@ -175,6 +175,29 @@ def plot_results(train_data, val_data, loss_data, lang, curr, nxt, args):
     val_loss = [t[1] for t in loss_data]
     generate_single_plot(train_loss, val_loss, args.epochs, "Loss", generate_title("Loss", lang, curr, nxt), generate_file_name(dname, "loss", lang, curr, nxt, args))
     
+    return dname
+    
+def save_test_prediction_results(dataset, model, loader, dname, lang, curr, nxt, args):
+    model.eval()
+
+    for data in loader:
+        print(data)
+        with torch.no_grad():
+            # max(dim=1) returns values, indices tuple; only need indices
+            pred = model(data).max(dim=1)[1]
+            label = data.y
+        
+        mask = data.test_mask
+            
+        pred = pred[mask]
+        label = data.y[mask]
+        fname = os.path.join(dname, f"{lang}-{curr}-{nxt}-predictions.txt")
+        with open(fname, "w") as f:
+            for i in tqdm(range(pred.shape[0])):
+                edge = data.eval_edges[:,i]
+                f.write(f"{data.reverse_edge_map[edge[0]]}\t{data.reverse_edge_map[edge[1]]}\t{pred[i].item()}\t{label[i].item()}\n")
+        
+    
 def run_experiment(lang, curr_year, future_year, args_list, feature_dir=None):
     try:
         print(f"Dataset: {lang}-{curr_year}-{future_year}")
@@ -186,8 +209,9 @@ def run_experiment(lang, curr_year, future_year, args_list, feature_dir=None):
             dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
         for args in args_list:
             args = objectview(args)
-            train_plot_data, val_plot_data, loss_data = train(dataset, args, dev)
-            plot_results(train_plot_data, val_plot_data, loss_data, lang, curr_year, future_year, args)
+            train_plot_data, val_plot_data, loss_data, model, loader = train(dataset, args, dev)
+            dname = plot_results(train_plot_data, val_plot_data, loss_data, lang, curr_year, future_year, args)
+            save_test_prediction_results(dataset, model, loader, dname, lang, curr_year, future_year, args)
     except Exception:
         print(traceback.format_exc())
         print("Experiment failed due to out of memory error")
