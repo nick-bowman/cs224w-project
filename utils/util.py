@@ -1,4 +1,7 @@
 import os
+from datetime import datetime
+import time
+from csv import DictReader
 import numpy as np
 
 home = os.path.expanduser("~")
@@ -42,6 +45,52 @@ def evaluate_predicted_edges(lang, curr_year, future_year, predicted_edges, filt
 
     return (precision, recall, f1)
 
+def timestamp_to_int(timestamp):
+    """
+    Takes a string timestamp in the form
+    
+        year-month-day hour-minute-second timezone
+        
+    and converts it into an integer.
+    
+    Parameters
+    ----------
+    timestamp : str
+        Timestamp in the form specified above.
+        
+    Returns
+    -------
+    int_timestamp : int
+        Timestamp in integer form.
+    """
+    dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S %Z")
+    return int(time.mktime(dt.timetuple()))
+
+def write_temporal_edge_list(temporal_graph_csv):
+    """
+    Creates a networkx-readable edge list with timestamps for each edge.
+    
+    Parameters
+    ----------
+    temporal_graph_csv : str
+        Absolute path to the .csv file containing the temporal graph data.
+    """
+    graph_file = open(temporal_graph_csv, 'r')
+    filename = os.path.splitext(temporal_graph_csv)[0]
+    edge_list_file = open(filename + "_edgelist.txt", 'w')
+    reader = DictReader(graph_file)
+    for row in reader:
+        timestamp = row["timestamp"]
+        int_timestamp = timestamp_to_int(timestamp)
+        start_id = str(row["start_id"])
+        end_id = str(row["end_id"])
+        data_dict = {"timestamp" : int_timestamp}
+        line = ' '.join((start_id, end_id, str(data_dict)))
+        edge_list_file.write(line + '\n')
+
+    graph_file.close()
+    edge_list_file.close()
+
 def load_rolx_features(dname):
     data_dir = os.path.join(rolx_base, dname)
     feature_file = os.path.join(data_dir, "v.txt")
@@ -54,6 +103,3 @@ def load_rolx_features(dname):
             ids = line.split()
             mappings[int(ids[1])] = int(ids[0])
     return embeds, mappings
-
-    
-    
