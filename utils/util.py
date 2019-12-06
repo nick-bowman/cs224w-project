@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+import time
 
 home = os.path.expanduser("~")
 base = os.path.join(home, "WikiLinksGraph/WikiLinksGraph")
@@ -41,3 +43,24 @@ def evaluate_predicted_edges(lang, curr_year, future_year, predicted_edges, filt
     f1 = 2 * precision * recall / (precision + recall)
 
     return (precision, recall, f1)
+
+def timestamp_to_int(timestamp):
+    """
+    Takes a string timestamp in the form
+    
+        year-month-day hour-minute-second timezone
+        
+    and converts it into an integer.
+    
+    Parameters
+    ----------
+    timestamp : str
+        Timestamp in the form specified above.
+        
+    Returns
+    -------
+    int_timestamp : int
+        Timestamp in integer form.
+    """
+    dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S %Z")
+    return int(time.mktime(dt.timetuple()))
