@@ -71,11 +71,7 @@ class GNNStack(torch.nn.Module):
 
     def loss(self, pred, label):
         return F.nll_loss(pred, label,weight=torch.Tensor([1,3]).to(self.dev))
-#         print(pred.shape)
-#         print(pred[0])
-#         print(label.shape)
-#         return F.binary_cross_entropy(pred,label,weight=torch.Tensor([1,4]).to(self.dev))
-    
+
 class GraphSage(pyg_nn.MessagePassing):
     """Non-minibatch version of GraphSage."""
     def __init__(self, in_channels, out_channels, reducer='mean', 

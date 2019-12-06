@@ -6,9 +6,8 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
+import traceback
 
-from torch_geometric.datasets import TUDataset
-from torch_geometric.datasets import Planetoid
 from torch_geometric.data import DataLoader
 
 import torch_geometric.nn as pyg_nn
@@ -24,10 +23,12 @@ from tqdm import tqdm
 
 from datasets import WikiGraphsInMemoryDataset
 from models.gnn import GNNStack
+from utils.util import load_rolx_features
 
 import torch.optim as optim
 
 from sklearn.metrics import precision_recall_fscore_support
+
 
 def build_optimizer(args, params):
     weight_decay = args.weight_decay
@@ -54,8 +55,7 @@ def train(dataset, args, dev):
     loader = DataLoader(dataset, shuffle=True)#, batch_size=args.batch_size, shuffle=True)
 
     # build model
-    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, args, dev)
-    model = model.to(dev)
+    model = GNNStack(dataset.num_node_features, args.hidden_dim, dataset.num_classes, args, dev).to(dev)
     scheduler, opt = build_optimizer(args, model.parameters())
         
     train_plot_data = []
@@ -175,15 +175,20 @@ def plot_results(train_data, val_data, loss_data, lang, curr, nxt, args):
     val_loss = [t[1] for t in loss_data]
     generate_single_plot(train_loss, val_loss, args.epochs, "Loss", generate_title("Loss", lang, curr, nxt), generate_file_name(dname, "loss", lang, curr, nxt, args))
     
-def run_experiment(lang, curr_year, future_year, args_list):
+def run_experiment(lang, curr_year, future_year, args_list, feature_dir=None):
     try:
         print(f"Dataset: {lang}-{curr_year}-{future_year}")
         dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
+        if feature_dir:
+            f, m = load_rolx_features(feature_dir)
+            dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev, node_features=f, node_feature_mapping=m)
+        else:
+            dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
         for args in args_list:
             args = objectview(args)
             train_plot_data, val_plot_data, loss_data = train(dataset, args, dev)
             plot_results(train_plot_data, val_plot_data, loss_data, lang, curr_year, future_year, args)
-    except: 
+    except Exception:
+        print(traceback.format_exc())
         print("Experiment failed due to out of memory error")
   

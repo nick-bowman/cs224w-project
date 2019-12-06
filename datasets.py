@@ -2,10 +2,11 @@ import os
 import torch
 import numpy as np
 # from torch.utils.data import Dataset, DataLoader
+import torch
 from torch_geometric.data import InMemoryDataset, Data
 import csv
 import snap
-from utils.util import project_base, generate_file_name, generate_diff_file_name
+from utils.util import project_base, generate_file_name, generate_diff_file_name, load_rolx_features
 
 # Ignore warnings
 import warnings
@@ -57,7 +58,7 @@ def create_masks(num_positive, num_negative, train, test, val, dev):
     return train_mask, test_mask, val_mask
 
 class WikiGraphsInMemoryDataset(InMemoryDataset):
-    def __init__(self, lang, current_year, future_year, dev, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=100, train=0.8, test=0.1, val=0.1):
+    def __init__(self, lang, current_year, future_year, dev, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=100, train=0.8, test=0.1, val=0.1, node_features=None, node_feature_mapping=None):
         self.lang = lang
         self.current_year = current_year
         self.future_year = future_year
@@ -69,6 +70,8 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         self.dev = dev
         self._edge_map = {}
         self.edge_counter = 0
+        self.node_features = node_features
+        self.node_feature_mapping = node_feature_mapping
         super(WikiGraphsInMemoryDataset, self).__init__(os.path.join(project_base, "datasets"), transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
                                                     
@@ -118,7 +121,14 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
             i += 1
         
         # TODO: replace with more complex node feature generation
-        x = torch.ones(size=(g.GetNodes(), self.feature_dim)).to(self.dev)
+        if self.node_features.any():
+            self.feature_dim = self.node_features.shape[1]
+            x = torch.ones(size=(g.GetNodes(), self.node_features.shape[1])).to(self.dev)
+            for init_id, feature_row in self.node_feature_mapping.items():
+                new_id = self._edge_map[init_id]
+                x[new_id] = torch.Tensor(self.node_features[feature_row]).to(self.dev)
+        else:
+            x = torch.ones(size=(g.GetNodes(), self.feature_dim)).to(self.dev)
         
         diff_g = snap.LoadEdgeList(snap.PNGraph, diff_file, 0, 1, "\t")
         num_positive = diff_g.GetEdges()
@@ -165,7 +175,10 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
     
 if __name__ == "__main__":
-    test = WikiGraphsInMemoryDataset("fr", 2002, 2003)
+    node_features, mapping = load_rolx_features("Spanish2003")
+#     print(node_features, mapping)
+    dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    test = WikiGraphsInMemoryDataset("es", 2003, 2004, dev, node_features=node_features, node_feature_mapping=mapping)
     
     
     

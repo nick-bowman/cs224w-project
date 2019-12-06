@@ -1,8 +1,10 @@
 import os
+import numpy as np
 
 home = os.path.expanduser("~")
 base = os.path.join(home, "WikiLinksGraph/WikiLinksGraph")
 project_base = os.path.join(home, "cs224w-project")
+rolx_base = os.path.join(home, "RolXEmbeddings")
 
 def generate_file_name(language, year):
     file_name = "%swiki.wikilink_graph.%s-03-01.csv" % (language, str(year))
@@ -22,8 +24,6 @@ def load_diff(language, curr_year, future_year):
 
 def evaluate_predicted_edges(lang, curr_year, future_year, predicted_edges, filter_nodes=None):
     true_added_edges = load_diff(lang, curr_year, future_year)
-#     print(predicted_edges)
-#     print(true_added_edges)
     
     to_remove = set()
     if filter_nodes:
@@ -41,3 +41,19 @@ def evaluate_predicted_edges(lang, curr_year, future_year, predicted_edges, filt
     f1 = 2 * precision * recall / (precision + recall)
 
     return (precision, recall, f1)
+
+def load_rolx_features(dname):
+    data_dir = os.path.join(rolx_base, dname)
+    feature_file = os.path.join(data_dir, "v.txt")
+    mappings_file = os.path.join(data_dir, "mappings.txt")
+    embeds = np.loadtxt(feature_file)
+    mappings = {}
+    with open(mappings_file, "r") as f:
+        for line in f:
+            if "#" in line: continue
+            ids = line.split()
+            mappings[int(ids[1])] = int(ids[0])
+    return embeds, mappings
+
+    
+    

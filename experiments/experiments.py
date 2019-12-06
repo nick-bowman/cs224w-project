@@ -1,5 +1,7 @@
 from gcn_experiments import run_experiment
 
+import torch
+
 def main():
     args_list = [
         {
@@ -40,13 +42,14 @@ def main():
             'lr': 0.01
         }  
     ]
-    run_experiment("es", 2005, 2006, args_list)
-    run_experiment("ru", 2005, 2006, args_list)
-    run_experiment("en", 2002, 2003, args_list)
-    run_experiment("de", 2004, 2005, args_list)
-    run_experiment("fr", 2004, 2005, args_list)
-    run_experiment("it", 2005, 2006, args_list)
-    run_experiment("nl", 2005, 2006, args_list)
+    run_experiment("es", 2005, 2006, args_list, feature_dir="Spanish2005")
+#     run_experiment("es", 2005, 2006, args_list)
+#     run_experiment("ru", 2005, 2006, args_list)
+#     run_experiment("en", 2002, 2003, args_list)
+#     run_experiment("de", 2004, 2005, args_list)
+#     run_experiment("fr", 2004, 2005, args_list)
+#     run_experiment("it", 2005, 2006, args_list)
+#     run_experiment("nl", 2005, 2006, args_list)
 
 if __name__ == "__main__":
     main()
