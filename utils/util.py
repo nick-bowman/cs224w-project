@@ -66,7 +66,7 @@ def timestamp_to_int(timestamp):
     dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S %Z")
     return int(time.mktime(dt.timetuple()))
 
-def write_temporal_edge_list(temporal_graph_csv):
+def write_temporal_edge_list_networkx(temporal_graph_csv):
     """
     Creates a networkx-readable edge list with timestamps for each edge.
     
@@ -77,7 +77,7 @@ def write_temporal_edge_list(temporal_graph_csv):
     """
     graph_file = open(temporal_graph_csv, 'r')
     filename = os.path.splitext(temporal_graph_csv)[0]
-    edge_list_file = open(filename + "_edgelist.txt", 'w')
+    edge_list_file = open(filename + "_edgelist_networkx.txt", 'w')
     reader = DictReader(graph_file)
     for row in reader:
         timestamp = row["timestamp"]
@@ -89,6 +89,52 @@ def write_temporal_edge_list(temporal_graph_csv):
         edge_list_file.write(line + '\n')
 
     graph_file.close()
+    edge_list_file.close()
+    
+def write_temporal_edge_list_snap(temporal_graph_csv):
+    """
+    Creates a Snap-readable edge list with timestamps for each edge.
+    
+    Parameters
+    ----------
+    temporal_graph_csv : str
+        Absolute path to the .csv file containing the temporal graph data.
+    """
+    graph_file = open(temporal_graph_csv, 'r')
+    filename = os.path.splitext(temporal_graph_csv)[0]
+    
+    reader = DictReader(graph_file)
+    seen_nodes = set()
+    edge_count = 0
+    with open(temporal_graph_csv, 'r') as graph_file:
+        reader = DictReader(graph_file)
+        for row in reader:
+            start_id = str(row["start_id"])
+            end_id = str(row["end_id"])
+            seen_nodes.add(start_id)
+            seen_nodes.add(end_id)
+            edge_count += 1
+    node_count = len(seen_nodes)
+    
+    edge_list_filename = filename + "_edgelist_snap.txt"
+    edge_list_file = open(edge_list_filename, 'w')
+    edge_list_file.write("# Directed network: {} \n".format(edge_list_filename))
+    edge_list_file.write("# Temporal edge list.\n")
+    edge_list_file.write("# Nodes: {} Edges: {}\n".format(node_count, edge_count))
+    edge_list_file.write("#NODES\tNId\n")
+    for node in seen_nodes:
+        edge_list_file.write(str(node) + '\n')
+    edge_list_file.write("#END\n")
+    edge_list_file.write("#EDGES\tSrcNId\tDstNId\tFlt:Timestamp\n")
+    with open(temporal_graph_csv, 'r') as graph_file:
+        reader = DictReader(graph_file)
+        for row in reader:
+            timestamp = str(timestamp_to_int(row["timestamp"]))
+            start_id = str(row["start_id"])
+            end_id = str(row["end_id"])
+            line = '\t'.join((start_id, end_id, timestamp))
+            edge_list_file.write(line + '\n')
+    edge_list_file.write("#END\n")
     edge_list_file.close()
 
 def load_rolx_features(dname):
