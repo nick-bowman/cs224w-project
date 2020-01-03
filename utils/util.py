@@ -3,19 +3,24 @@ from datetime import datetime
 import time
 from csv import DictReader
 import numpy as np
+from tqdm import tqdm
+import cugraph
+import cudf
+import mmap
 
 home = os.path.expanduser("~")
 base = os.path.join(home, "WikiLinksGraph/WikiLinksGraph")
 project_base = os.path.join(home, "cs224w-project")
 rolx_base = os.path.join(home, "RolXEmbeddings")
+GOLD_DIR = "gold_edges"
 
 def generate_file_name(language, year):
     file_name = "%swiki.wikilink_graph.%s-03-01.csv" % (language, str(year))
     return os.path.join(base, file_name)
 
-def generate_diff_file_name(lang, curr, future):
+def generate_gold_file_name(lang, curr, future):
     file_name = f"{lang}wiki-{curr}-{future}-diff.csv"
-    return os.path.join(project_base, "data_diffs", file_name)
+    return os.path.join(project_base, "gold_edges", file_name)
 
 def load_diff(language, curr_year, future_year):
     all_edges = set()
@@ -103,3 +108,42 @@ def load_rolx_features(dname):
             ids = line.split()
             mappings[int(ids[1])] = int(ids[0])
     return embeds, mappings
+
+def load_temporal_features(filename):
+    data_file = os.path.join(home, filename)
+    with open(data_file, "r") as f:
+        lines = f.readlines()[1:]
+    embeds = np.loadtxt(lines)
+    mappings = {}
+    for i in tqdm(range(embeds.shape[0])):
+        node_id = int(embeds[i][0])
+        mappings[node_id] = i
+    embeds = embeds[:,1:]
+    return embeds, mappings
+
+def load_cugraph(lang, year):
+    G = cugraph.Graph()
+    
+    file_name = generate_file_name(lang, year)
+
+    gdf = cudf.read_csv(file_name, usecols=[0,2], dtype=["int32", "str", "int32", "str"], sep="\t")
+
+    sources = cudf.Series(gdf["page_id_from"])
+    destinations = cudf.Series(gdf["page_id_to"])
+    source_col, dest_col, renumbering_map = cugraph.renumber(sources, destinations)
+
+    G.add_edge_list(source_col, dest_col, None)
+    
+    return G, renumbering_map
+
+def get_num_lines(file_path):
+    """
+    Calculates and returns the number of lines in a file. Helpful for 
+    tqdm progress bar for file reading. 
+    """
+    fp = open(file_path, "r+")
+    buf = mmap.mmap(fp.fileno(), 0)
+    lines = 0
+    while buf.readline():
+        lines += 1
+    return lines

@@ -7,6 +7,7 @@ from torch_geometric.data import InMemoryDataset, Data
 import csv
 import snap
 from utils.util import project_base, generate_file_name, generate_diff_file_name, load_rolx_features
+from tqdm import tqdm
 
 # Ignore warnings
 import warnings
@@ -58,7 +59,7 @@ def create_masks(num_positive, num_negative, train, test, val, dev):
     return train_mask, test_mask, val_mask
 
 class WikiGraphsInMemoryDataset(InMemoryDataset):
-    def __init__(self, lang, current_year, future_year, dev, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=100, train=0.8, test=0.1, val=0.1, node_features=None, node_feature_mapping=None):
+    def __init__(self, lang, current_year, future_year, dev, sample_factor=0.1, transform=None, pre_transform=None, num_node_features=64, train=0.8, test=0.1, val=0.1, node_features=None, node_feature_mapping=None):
         self.lang = lang
         self.current_year = current_year
         self.future_year = future_year
@@ -81,7 +82,8 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
     
     @property
     def processed_file_names(self):
-        return [f"{self.lang}-{self.current_year}-{self.future_year}-data.pt"]
+        feat = "n" if self.node_features is not None else "u"
+        return [f"{self.lang}-{self.current_year}-{self.future_year}-{feat}-data.pt"]
     
     @property
     def num_node_features(self):
@@ -124,9 +126,10 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         if self.node_features is not None:
             self.feature_dim = self.node_features.shape[1]
             x = torch.ones(size=(g.GetNodes(), self.node_features.shape[1])).to(self.dev)
-            for init_id, feature_row in self.node_feature_mapping.items():
-                new_id = self._edge_map[init_id]
-                x[new_id] = torch.Tensor(self.node_features[feature_row]).to(self.dev)
+            for init_id, feature_row in tqdm(self.node_feature_mapping.items()):
+                if init_id in self._edge_map:
+                    new_id = self._edge_map[init_id]
+                    x[new_id] = torch.Tensor(self.node_features[feature_row]).to(self.dev)
         else:
             x = torch.ones(size=(g.GetNodes(), self.feature_dim)).to(self.dev)
         
@@ -137,7 +140,7 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         edge_list = torch.tensor([[0] * num_edges_in_dataset, [0] * num_edges_in_dataset]).to(self.dev)
         y = torch.zeros(num_edges_in_dataset).to(self.dev)
         i = 0
-        for e in diff_g.Edges():
+        for e in tqdm(diff_g.Edges(), total=diff_g.GetEdges()):
             src = self.get_renumbered_edge(e.GetSrcNId())
             dst = self.get_renumbered_edge(e.GetDstNId())
             edge_list[0][i] = src
@@ -146,6 +149,8 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
         
         y[:num_positive] = 1
                 
+        pbar = tqdm(total = num_edges_in_dataset)
+
         while i < num_edges_in_dataset:
             src = g.GetRndNId()
             dst = g.GetRndNId()
@@ -155,6 +160,8 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
                 edge_list[0][i] = src
                 edge_list[1][i] = dst
                 i += 1
+                pbar.update(1)
+        pbar.close()
         
         train_mask, test_mask, val_mask = create_masks(num_positive, num_negative, self.train, self.test, self.val, self.dev)
                 

@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 from datasets import WikiGraphsInMemoryDataset
 from models.gnn import GNNStack
-from utils.util import load_rolx_features
+from utils.util import load_rolx_features, load_temporal_features
 
 import torch.optim as optim
 
@@ -71,7 +71,7 @@ def train(dataset, args, dev):
             pred = model(batch)
             label = batch.y
             with torch.no_grad():
-                val_loss += F.nll_loss(pred[batch.val_mask], label[batch.val_mask],weight=torch.Tensor([1,3]).to(dev))
+                val_loss += F.nll_loss(pred[batch.val_mask], label[batch.val_mask], weight=torch.Tensor([1,3]).to(dev))
             pred = pred[batch.train_mask]
             label = label[batch.train_mask]
             loss = model.loss(pred, label)
@@ -198,13 +198,14 @@ def save_test_prediction_results(dataset, model, loader, dname, lang, curr, nxt,
                 f.write(f"{data.reverse_edge_map[edge[0]]}\t{data.reverse_edge_map[edge[1]]}\t{pred[i].item()}\t{label[i].item()}\n")
         
     
-def run_experiment(lang, curr_year, future_year, args_list, feature_dir=None):
+def run_experiment(lang, curr_year, future_year, args_list, feature_dir=None, num_node_features=None):
     try:
         print(f"Dataset: {lang}-{curr_year}-{future_year}")
         dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if feature_dir:
-            f, m = load_rolx_features(feature_dir)
-            dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev, node_features=f, node_feature_mapping=m)
+            # f, m = load_rolx_features(feature_dir)
+            f, m = load_temporal_features(feature_dir)
+            dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev, node_features=f, node_feature_mapping=m, num_node_features=num_node_features)
         else:
             dataset = WikiGraphsInMemoryDataset(lang, curr_year, future_year, dev)
         for args in args_list:
