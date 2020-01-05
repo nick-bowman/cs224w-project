@@ -2,23 +2,13 @@ import networkx as nx
 
 import matplotlib.pyplot as plt
 
-from utils.util import generate_file_name
+from utils.util import generate_file_name, load_networkx_graph
 
 from tqdm import tqdm
 from datasets import WikiGraphsInMemoryDataset
 import collections
 import numpy as np
 
-def load_networkx_graph(filename):
-    G = nx.DiGraph()
-    
-    with open(filename, "r") as f:
-        lines = f.readlines()
-    
-    edges = [(int(t[0]), int(t[2])) for t in [l.split("\t") for l in lines[1:]]]
-    G.add_edges_from(edges)
-    
-    return G
 
 def visualize_subgraph(nodes_of_interest, lang, curr, nxt, filename):
     curr_filename = generate_file_name(lang, curr)

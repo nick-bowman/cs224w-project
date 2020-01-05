@@ -4,9 +4,11 @@ import time
 from csv import DictReader
 import numpy as np
 from tqdm import tqdm
-import cugraph
-import cudf
+# import cugraph
+# import cudf
 import mmap
+import networkx as nx
+
 
 home = os.path.expanduser("~")
 base = os.path.join(home, "WikiLinksGraph/WikiLinksGraph")
@@ -193,3 +195,22 @@ def get_num_lines(file_path):
     while buf.readline():
         lines += 1
     return lines
+
+def load_networkx_graph(filename):
+    G = nx.DiGraph()
+    
+    first = True
+    with open(filename, "r") as f:
+        for line in tqdm(f, total=get_num_lines(filename)):
+            if first:
+                first = False
+                continue
+            l = line.strip().split("\t")
+            G.add_edge(int(l[0]), int(l[2]))
+#     print("here2")
+#     edges = [(int(t[0]), int(t[2])) for t in [l.split("\t") for l in lines[1:]]]
+#     print("here3")
+#     G.add_edges_from(edges)
+#     print("here4")
+    
+    return G
