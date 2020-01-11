@@ -122,7 +122,6 @@ class WikiGraphsInMemoryDataset(InMemoryDataset):
             edge_index[1][i] = dst
             i += 1
         
-        # TODO: replace with more complex node feature generation
         if self.node_features is not None:
             self.feature_dim = self.node_features.shape[1]
             x = torch.ones(size=(g.GetNodes(), self.node_features.shape[1])).to(self.dev)

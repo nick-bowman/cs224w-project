@@ -20,8 +20,8 @@ def generate_file_name(language, year):
     file_name = "%swiki.wikilink_graph.%s-03-01.csv" % (language, str(year))
     return os.path.join(base, file_name)
 
-def generate_gold_file_name(lang, curr, future):
-    file_name = f"{lang}wiki-{curr}-{future}-diff.csv"
+def generate_gold_file_name(lang, curr, future, k=1):
+    file_name = f"{lang}wiki-{curr}-{future}-{k}-gold.csv"
     return os.path.join(project_base, "gold_edges", file_name)
 
 def load_diff(language, curr_year, future_year):
@@ -196,21 +196,16 @@ def get_num_lines(file_path):
         lines += 1
     return lines
 
-def load_networkx_graph(filename):
+def load_networkx_graph(filename, src_index=0, dst_index=2, skip_first=True):
     G = nx.DiGraph()
     
-    first = True
+    first = skip_first
     with open(filename, "r") as f:
         for line in tqdm(f, total=get_num_lines(filename)):
             if first:
                 first = False
                 continue
             l = line.strip().split("\t")
-            G.add_edge(int(l[0]), int(l[2]))
-#     print("here2")
-#     edges = [(int(t[0]), int(t[2])) for t in [l.split("\t") for l in lines[1:]]]
-#     print("here3")
-#     G.add_edges_from(edges)
-#     print("here4")
+            G.add_edge(int(l[src_index]), int(l[dst_index]))
     
     return G

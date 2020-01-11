@@ -23,10 +23,9 @@ def generate_edge_difference_snap(lang, curr, future, k=1):
 def generate_gold_edges_networkx(lang, curr, future, k=1):
     g1 = load_networkx_graph(generate_file_name(lang, curr))
     g2_filename = generate_file_name(lang, future)
-    print(g1.number_of_edges())
-    print(g1.number_of_nodes())
     edges = g1.edges()
     nodes = g1.nodes()
+    degrees = g1.degree
     first = True
     with open(g2_filename) as f:
         with open(f"{GOLD_DIR}/{lang}wiki-{curr}-{future}-{k}-gold.csv", "w") as outfile:
@@ -36,7 +35,7 @@ def generate_gold_edges_networkx(lang, curr, future, k=1):
                     continue
                 line = line.strip().split("\t")
                 src, dst = int(line[0]), int(line[2])
-                if src in nodes and dst in nodes and (src, dst) not in edges: 
+                if src in nodes and dst in nodes and degrees[src] >= k and degrees[dst] >= k and (src, dst) not in edges: 
                     outfile.write(f"{src}\t{dst}\n")
 
 def main():
@@ -46,7 +45,7 @@ def main():
         for year in YEARS:
             if year != 2018: 
                 print(lang, year, year+1)
-                generate_gold_edges_networkx(lang, year, year+1, k=1)
+                generate_gold_edges_networkx(lang, year, year+1, k=3)
                 
 
 if __name__ == "__main__":
