@@ -4,8 +4,8 @@ import time
 from csv import DictReader
 import numpy as np
 from tqdm import tqdm
-# import cugraph
-# import cudf
+import cugraph
+import cudf
 import mmap
 import networkx as nx
 
@@ -23,6 +23,21 @@ def generate_file_name(language, year):
 def generate_gold_file_name(lang, curr, future, k=1):
     file_name = f"{lang}wiki-{curr}-{future}-{k}-gold.csv"
     return os.path.join(project_base, "gold_edges", file_name)
+
+def generate_training_file_name(lang, curr, k=1):
+    file_name = "training.csv"
+    folder_name = f"{lang}wiki-{curr}-{k}"
+    return os.path.join(project_base, "datasets", folder_name, file_name)
+
+def generate_test_file_name(lang, curr, k=1):
+    file_name = "test.csv"
+    folder_name = f"{lang}wiki-{curr}-{k}"
+    return os.path.join(project_base, "datasets", folder_name, file_name)
+
+def generate_validation_file_name(lang, curr, k=1):
+    file_name = "validation.csv"
+    folder_name = f"{lang}wiki-{curr}-{k}"
+    return os.path.join(project_base, "datasets", folder_name, file_name)
 
 def load_diff(language, curr_year, future_year):
     all_edges = set()
@@ -169,12 +184,12 @@ def load_temporal_features(filename):
     embeds = embeds[:,1:]
     return embeds, mappings
 
-def load_cugraph(lang, year):
+def load_cugraph(lang, year, usecols=[0,2], dtype=["int32", "str", "int32", "str"]):
     G = cugraph.Graph()
     
     file_name = generate_file_name(lang, year)
 
-    gdf = cudf.read_csv(file_name, usecols=[0,2], dtype=["int32", "str", "int32", "str"], sep="\t")
+    gdf = cudf.read_csv(file_name, usecols=usecols, dtype=dtype, sep="\t")
 
     sources = cudf.Series(gdf["page_id_from"])
     destinations = cudf.Series(gdf["page_id_to"])
