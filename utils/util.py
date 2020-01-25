@@ -4,8 +4,6 @@ import time
 from csv import DictReader
 import numpy as np
 from tqdm import tqdm
-import cugraph
-import cudf
 import mmap
 import networkx as nx
 
@@ -185,7 +183,9 @@ def load_temporal_features(filename):
     return embeds, mappings
 
 def load_cugraph(lang, year, usecols=[0,2], dtype=["int32", "str", "int32", "str"]):
-    G = cugraph.Graph()
+    import cugraph
+    import cudf
+    G = cugraph.DiGraph()
     
     file_name = generate_file_name(lang, year)
 
@@ -195,7 +195,11 @@ def load_cugraph(lang, year, usecols=[0,2], dtype=["int32", "str", "int32", "str
     destinations = cudf.Series(gdf["page_id_to"])
     source_col, dest_col, renumbering_map = cugraph.renumber(sources, destinations)
 
-    G.add_edge_list(source_col, dest_col, None)
+    edge_df = cudf.DataFrame()
+    edge_df.add_column("src", source_col)
+    edge_df.add_column("dst", dest_col)
+    
+    G.from_cudf_edgelist(edge_df, source="src", target="dst")
     
     return G, renumbering_map
 
